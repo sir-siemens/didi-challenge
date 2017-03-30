@@ -24,8 +24,10 @@ catkin_make
 source devel/setup.bash
 rosrun velodye2image velodye2image_node
 ```
-After running this, a node is spawned to hear on topic '/kitti/velo/pointcloud'
+After running this, a node is spawned which listen on the topic '/kitti/velo/pointcloud'
+
 use rosbag to publish point cloud, you will find image data are generated.
+
 Example image:
 ![image001]
 
