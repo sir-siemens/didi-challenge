@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+   
+   <param name="robot_description"
+         command="$(find xacro)/xacro.py '$(find didi-playbag)/mkz-description/mkz.urdf.xacro'" />
+   <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub" >
+        <remap from="joint_states" to="/vehicle/joint_states" />
+   </node>
+</launch>
