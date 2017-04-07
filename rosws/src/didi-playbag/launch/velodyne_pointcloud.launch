@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="velodyne_pointcloud" type="cloud_node" name="velodyne_cloud">
+     <param name="calibration" value="$(find velodyne_pointcloud)/params/32db.yaml"/>
+  </node>
+</launch>
+
+
