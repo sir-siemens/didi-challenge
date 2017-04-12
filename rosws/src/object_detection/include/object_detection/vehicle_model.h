@@ -3,7 +3,10 @@
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Pose2D.h>
 #include <geometry_msgs/PoseArray.h>
-
+#include <ros/ros.h>
+#include <boost/random/uniform_real.hpp>
+#include <boost/random/variate_generator.hpp>
+#include <boost/random/mersenne_twister.hpp>
 namespace didi{
 
 struct Particle {
@@ -18,17 +21,39 @@ class Vehicle_model
 public:
     Vehicle_model();
 
-    void create_particles(int number);
+    // return expected pose when conduct a random noise
+    static Particle motion_model(Particle p, double theta_t);
 
+
+    // add particles based on the new detection
+    void add_particles(int number);
+
+    // parameter of a tracked vehicle
     geometry_msgs::Twist velocity_;
     geometry_msgs::Pose2D pose_;
     geometry_msgs::Vector3 boundingbox_;
 
-    // particles which represent the vehicle distribution
+    // normalize the current particles weights so that the weights summing up to 1
+    void normalize_weight();
+
+    // update the member variable particles_ with the paritcle index
+    void update_particles(std::vector<int> particle_index);
+
+    // compute the estimate from the particles
+    void compute_estimate();
+
+
+    std::vector<double> get_weights();
     std::vector< Particle > particles_;
+    double max_weight_;
+    static boost::random::mt19937 rng_;
 
-
+    // parameter of motion noise
+    static double linear_noise_;  // 1.0 m/s
+    static double angular_noise_; // 5.0 grad
 
 };
+
+
 }
 #endif // VEHICLE_MODEL_H

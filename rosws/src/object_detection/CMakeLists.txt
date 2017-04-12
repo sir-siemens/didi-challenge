@@ -127,6 +127,7 @@ add_library(object_detection
    src/detection_pipeline.cpp
    src/sensor.cpp
    src/vehicle_model.cpp
+   src/particlefilter.cpp
 )
 
 ## Add cmake target dependencies of the library

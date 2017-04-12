@@ -37,6 +37,9 @@ public:
     double find_correspondence_and_prob(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
                                              geometry_msgs::Point desired_measurement);
 
+    double target_width() { return target_w_;}
+    double target_length() { return target_l_;}
+
 
 private:
 
