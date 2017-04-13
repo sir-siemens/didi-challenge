@@ -123,6 +123,7 @@ geometry_msgs::PoseArray Vehicle_model::getParticlePoses() {
         geometry_msgs::Pose p;
         p.position.x = particles_[i].pose_.x;
         p.position.y = particles_[i].pose_.y;
+        p.position.z = particles_[i].weight_;
         p.orientation = tf::createQuaternionMsgFromYaw(particles_[i].pose_.theta);
         pa.poses[i] = p;
     }

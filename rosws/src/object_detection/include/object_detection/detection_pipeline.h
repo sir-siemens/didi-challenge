@@ -23,7 +23,8 @@ class DetectionPipeline
 
         void detect();
 
-        void trigger_detection_cb (const sensor_msgs::Image::ConstPtr& msg);
+        void timerCallback(const ros::TimerEvent&);
+
 
         void visualize_particles(ros::Publisher &pub);
     private:
@@ -45,6 +46,7 @@ class DetectionPipeline
         //
         ros::Subscriber camera_sub_;
         ros::Time current_time_;
+        ros::Timer timer_;
 
 
 };

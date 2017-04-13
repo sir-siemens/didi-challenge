@@ -11,6 +11,7 @@ DetectionPipeline::DetectionPipeline() {
     //sensor_list_.push_back(velodyne);
     // delta t
     detection_interval_ = 0.1;
+    // 0.1 second
     ros::NodeHandle n;
     particle_publisher_ = n.advertise<geometry_msgs::PoseArray>(
          "particles", 1);
@@ -18,8 +19,10 @@ DetectionPipeline::DetectionPipeline() {
                 "resample_particles", 1);
     resampled_particle_after_motion_publisher_ = n.advertise<geometry_msgs::PoseArray>(
                 "resample_particles_after_motion_update", 1);
-    camera_sub_ = n.subscribe("/image_raw", 1 , &DetectionPipeline::trigger_detection_cb, this);
 
+    timer_ = n.createTimer(ros::Duration(detection_interval_), &DetectionPipeline::timerCallback,this);
+
+    timer_.start();
 }
 
 void DetectionPipeline::detect() {
@@ -44,9 +47,6 @@ void DetectionPipeline::detect() {
         detected_vehicle_list_[i].add_particles(500);
 
     }
-    //// DEBUG visualize particles
-    visualize_particles(particle_publisher_);
-    //////////////////////////////////////////
 
     ros::WallTime create_sample = ros::WallTime::now();
     ROS_INFO("Create initial sample takes %f second",  (create_sample - begin).toSec());
@@ -68,6 +68,11 @@ void DetectionPipeline::detect() {
 
     ros::WallTime compute_weights = ros::WallTime::now();
     ROS_INFO("compute_weights takes %f second",  (compute_weights - create_sample).toSec());
+
+
+    //// DEBUG visualize particles
+    visualize_particles(particle_publisher_);
+    //////////////////////////////////////////
 
     // 4. resampling 500 particles
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
@@ -153,11 +158,10 @@ void DetectionPipeline::visualize_particles(ros::Publisher &pub) {
     pub.publish(particles_proposal);
 }
 
-void DetectionPipeline::trigger_detection_cb (const sensor_msgs::Image::ConstPtr& msg) {
+void DetectionPipeline::timerCallback(const ros::TimerEvent&) {
     // detection triggered
-    current_time_ = msg->header.stamp;
+    current_time_ = ros::Time::now();
     detect();
 }
-
 
 }
