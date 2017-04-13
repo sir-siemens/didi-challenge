@@ -15,7 +15,7 @@ std::vector<int> ParticleFilter::importance_sampling( std::vector<double> weight
         while ( weights[index] < beta ) {
             beta = beta - weights[index];
             index = index + 1;
-            if (index = weights.size()){
+            if (index == weights.size()){
                 index = 0;
             }
         }

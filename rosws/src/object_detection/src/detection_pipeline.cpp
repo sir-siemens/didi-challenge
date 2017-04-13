@@ -9,13 +9,22 @@ DetectionPipeline::DetectionPipeline() {
     // TODO add two other modality
     //sensor_list_.push_back(camera);
     //sensor_list_.push_back(velodyne);
-
     // delta t
     detection_interval_ = 0.1;
+    ros::NodeHandle n;
+    particle_publisher_ = n.advertise<geometry_msgs::PoseArray>(
+         "particles", 1);
+    resampled_particle_publisher_ = n.advertise<geometry_msgs::PoseArray>(
+                "resample_particles", 1);
+    resampled_particle_after_motion_publisher_ = n.advertise<geometry_msgs::PoseArray>(
+                "resample_particles_after_motion_update", 1);
+    camera_sub_ = n.subscribe("/image_raw", 1 , &DetectionPipeline::trigger_detection_cb, this);
+
 }
 
-void DetectionPipeline::mainLoop() {
+void DetectionPipeline::detect() {
 
+    ros::WallTime begin = ros::WallTime::now();
     // 1. vehicle detection and propose new particles from the current measurement 500
     for (size_t i = 0; i < sensor_list_.size(); i++) {
         std::vector <Vehicle_model> vehicles;
@@ -33,7 +42,14 @@ void DetectionPipeline::mainLoop() {
     for (size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
         // TODO: currently particle only have 3 dimension
         detected_vehicle_list_[i].add_particles(500);
+
     }
+    //// DEBUG visualize particles
+    visualize_particles(particle_publisher_);
+    //////////////////////////////////////////
+
+    ros::WallTime create_sample = ros::WallTime::now();
+    ROS_INFO("Create initial sample takes %f second",  (create_sample - begin).toSec());
 
     // 3. compute weights for each particles
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
@@ -49,16 +65,26 @@ void DetectionPipeline::mainLoop() {
         }
         detected_vehicle_list_[i].normalize_weight();
     }
+
+    ros::WallTime compute_weights = ros::WallTime::now();
+    ROS_INFO("compute_weights takes %f second",  (compute_weights - create_sample).toSec());
+
     // 4. resampling 500 particles
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
-
-        std::vector<int> particle_index = ParticleFilter::importance_sampling(detected_vehicle_list_[i].get_weights(),
-                                            500 ,
-                                            detected_vehicle_list_[i].max_weight_ );
-
-        // update particles
-        detected_vehicle_list_[i].update_particles(particle_index);
+        if (detected_vehicle_list_[i].all_weights_zero_ == false) {
+            std::vector<int> particle_index = ParticleFilter::importance_sampling(detected_vehicle_list_[i].get_weights(),
+                                                500 ,
+                                                detected_vehicle_list_[i].max_weight_ );
+            // update particles
+            detected_vehicle_list_[i].update_particles(particle_index);
+        }
     }
+    ros::WallTime resample = ros::WallTime::now();
+    ROS_INFO("resample takes %f second",  (resample - compute_weights).toSec());
+
+    //// DEBUG visualize particles
+    visualize_particles(resampled_particle_publisher_);
+    //////////////////////////////////////////
 
     // 5. compute the mean and variance
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
@@ -106,12 +132,32 @@ void DetectionPipeline::mainLoop() {
             detected_vehicle_list_[i].particles_[j].pose_.theta = tf::getYaw(base_deltaTparticle.rotation);
         }
     }
-
-
-
+    //// DEBUG visualize particles
+    visualize_particles(resampled_particle_after_motion_publisher_);
+    //////////////////////////////////////////
+    ros::WallTime end = ros::WallTime::now();
+    ros::WallDuration track_duration = end - begin;
+    ROS_INFO("Detection takes %f second",  track_duration.toSec());
 }
 
+void DetectionPipeline::visualize_particles(ros::Publisher &pub) {
+    geometry_msgs::PoseArray particles_proposal;
+    particles_proposal.header.frame_id = "base_link";
+    for (size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
+        geometry_msgs::PoseArray pa = detected_vehicle_list_[i].getParticlePoses();
+        // insert to particles_proposal
 
+        particles_proposal.poses.insert( particles_proposal.poses.end(), pa.poses.begin(), pa.poses.end() );
+    }
+    particles_proposal.header.stamp = current_time_;
+    pub.publish(particles_proposal);
+}
+
+void DetectionPipeline::trigger_detection_cb (const sensor_msgs::Image::ConstPtr& msg) {
+    // detection triggered
+    current_time_ = msg->header.stamp;
+    detect();
+}
 
 
 }

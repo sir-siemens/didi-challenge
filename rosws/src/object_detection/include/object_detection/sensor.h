@@ -12,7 +12,7 @@ class Sensor
       */
 public:
     Sensor();
-
+    ~Sensor();
     virtual void detect_vehicle(std::vector <Vehicle_model> &vehicle_list)  = 0;
 
     virtual double compute_weight( Particle p);

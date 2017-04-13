@@ -136,7 +136,7 @@ add_library(object_detection
 # add_dependencies(object_detection ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(object_detection_node src/object_detection_node.cpp)
+add_executable(object_detection_node src/main.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
@@ -147,6 +147,10 @@ target_link_libraries(object_detection
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
 
+)
+
+target_link_libraries(object_detection_node
+  object_detection
 )
 
 #############

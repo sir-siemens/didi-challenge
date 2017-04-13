@@ -11,6 +11,8 @@
 #include <geometry_msgs/Transform.h>
 #include <object_detection/transforms.h>
 #include <tf/transform_datatypes.h>
+#include <geometry_msgs/PoseArray.h>
+#include <sensor_msgs/Image.h>
 namespace didi{
 
 
@@ -19,9 +21,11 @@ class DetectionPipeline
     public:
         DetectionPipeline();
 
-        void mainLoop();
+        void detect();
 
+        void trigger_detection_cb (const sensor_msgs::Image::ConstPtr& msg);
 
+        void visualize_particles(ros::Publisher &pub);
     private:
         std::vector< boost::shared_ptr<Sensor> > sensor_list_;
 
@@ -32,6 +36,15 @@ class DetectionPipeline
         double detection_interval_;
 
         geometry_msgs::Twist ego_velocity_;
+
+        // visualization
+        ros::Publisher particle_publisher_;
+        ros::Publisher resampled_particle_publisher_;
+        ros::Publisher resampled_particle_after_motion_publisher_;
+
+        //
+        ros::Subscriber camera_sub_;
+        ros::Time current_time_;
 
 
 };

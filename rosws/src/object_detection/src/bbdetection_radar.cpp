@@ -7,6 +7,9 @@ BBDetection_Radar::BBDetection_Radar()
     // initialize some parameter
     target_w_ = 2.0;
     target_l_ = 5.0;
+    fov_ =  M_PI/3.0;
+    param_sigma_gaussian_ = 1.0;
+    vehicle_radius_ = 4;
 
     base_linkTradar_ego_.translation.x = 3.8;
     base_linkTradar_ego_.rotation.w = 1.0;
@@ -42,8 +45,39 @@ double BBDetection_Radar::find_correspondence_and_prob(pcl::PointCloud<pcl::Poin
     }
 
     // return probability of gaussian N(0, 3m)
-    double prob = 1.0 / (param_sigma_gaussian_ * sqrt(2*M_PI) *exp( -0.5* pow(min_distance/param_sigma_gaussian_ ,2)));
+    double prob = 1.0 / (param_sigma_gaussian_ * sqrt(2*M_PI) )  * exp( -0.5* pow(min_distance/param_sigma_gaussian_ ,2));
     return prob;
+}
+
+double BBDetection_Radar::measurement_model_simple(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
+                                geometry_msgs::Pose2D ego_T_target ) {
+    // transform target in radar link
+    geometry_msgs::Transform egoTtarget_tr;
+    egoTtarget_tr.translation.x = ego_T_target.x;
+    egoTtarget_tr.translation.y = ego_T_target.y;
+    egoTtarget_tr.rotation = tf::createQuaternionMsgFromYaw (ego_T_target.theta);
+
+
+    geometry_msgs::Transform radarTtarget = multiplyTransformMsg(radarTbaselink_ego_,
+                                                                 egoTtarget_tr) ;
+    // determine if target vehicle in fov if not return 0 or a very small number
+    float yaw_angle = atan2(radarTtarget.translation.y, radarTtarget.translation.x);
+    if ( fabs(yaw_angle) > fov_/2.0 ) {
+        return 0.0;
+    }
+    // assume vehicle is a circle with radius
+
+    double t =  1 -   vehicle_radius_ / sqrt( pow(radarTtarget.translation.x,2) + pow(radarTtarget.translation.y,2) );
+    if (t > 0.0 && t < 1.0) {
+        double desired_measurement_x = t * radarTtarget.translation.x;
+        double desired_measurement_y = t * radarTtarget.translation.y;
+        geometry_msgs::Point desired_measurement;
+        desired_measurement.x = desired_measurement_x;
+        desired_measurement.y = desired_measurement_y;
+        return find_correspondence_and_prob(input_radar_cloud, desired_measurement);
+    } else {
+        return 0;
+    }
 }
 
 
@@ -186,6 +220,14 @@ bool BBDetection_Radar::intersect(geometry_msgs::Point line1_seg_pt1,
 double BBDetection_Radar::cross2d(Eigen::Vector2d v, Eigen::Vector2d w) {
     return v[0] * w[1] - v[1] * w[0] ;
 }
+
+
+geometry_msgs::Point BBDetection_Radar::transform_radar_ptInEgo_baselink(geometry_msgs::Point pInradar) {
+    geometry_msgs::Point pointInbaselink = transformPoint(base_linkTradar_ego_, pInradar);
+    return pointInbaselink;
+
+}
+
 
 }
 

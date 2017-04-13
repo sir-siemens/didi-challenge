@@ -20,6 +20,8 @@ private:
     BBDetection_Radar rader_detector_;
     sensor_msgs::PointCloud2::ConstPtr cloud_ptr_;
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_depth_ptr_;
+    bool radar_cloud_recieved_;
+    double radar_max_;
 };
 
 }

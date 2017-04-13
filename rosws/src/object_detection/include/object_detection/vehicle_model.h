@@ -7,6 +7,8 @@
 #include <boost/random/uniform_real.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <boost/random/mersenne_twister.hpp>
+#include <tf/transform_datatypes.h>
+
 namespace didi{
 
 struct Particle {
@@ -34,7 +36,7 @@ public:
     geometry_msgs::Vector3 boundingbox_;
 
     // normalize the current particles weights so that the weights summing up to 1
-    void normalize_weight();
+    bool normalize_weight();
 
     // update the member variable particles_ with the paritcle index
     void update_particles(std::vector<int> particle_index);
@@ -42,6 +44,7 @@ public:
     // compute the estimate from the particles
     void compute_estimate();
 
+    geometry_msgs::PoseArray getParticlePoses();
 
     std::vector<double> get_weights();
     std::vector< Particle > particles_;
@@ -52,6 +55,7 @@ public:
     static double linear_noise_;  // 1.0 m/s
     static double angular_noise_; // 5.0 grad
 
+    bool all_weights_zero_;
 };
 
 

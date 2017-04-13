@@ -22,6 +22,11 @@ public:
     double measurement_model( pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
                               geometry_msgs::Pose2D ego_T_target);
 
+    /**
+      A simple measurement model which assumes the vehicle is modelled as a circle
+      */
+    double measurement_model_simple(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
+                                    geometry_msgs::Pose2D ego_T_target );
 
     std::vector<geometry_msgs::Pose2D> vehicles_proposal(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud);
 
@@ -40,6 +45,9 @@ public:
     double target_width() { return target_w_;}
     double target_length() { return target_l_;}
 
+    // transform a point detected from radar link to base link
+    geometry_msgs::Point transform_radar_ptInEgo_baselink(geometry_msgs::Point pInradar);
+
 
 private:
 
@@ -49,6 +57,8 @@ private:
     float fov_;
     double param_sigma_gaussian_;
 
+    // outscribe radius
+    double vehicle_radius_;
     //
     geometry_msgs::Transform base_linkTradar_ego_;
     geometry_msgs::Transform radarTbaselink_ego_;

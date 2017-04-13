@@ -5,15 +5,16 @@ namespace didi{
 
 double Vehicle_model::linear_noise_ = 1.0;
 double Vehicle_model::angular_noise_ = 5.0;
-
+boost::random::mt19937 Vehicle_model::rng_;
 Vehicle_model::Vehicle_model()   {
 
 }
 
-void Vehicle_model::normalize_weight() {
+bool Vehicle_model::normalize_weight() {
     if (particles_.size() == 0) {
         ROS_WARN("particle size is zero");
-        return;
+        all_weights_zero_ = true;
+        return false;
     }
     double max_weight = 0;
     double sum_weight = 0;
@@ -32,10 +33,12 @@ void Vehicle_model::normalize_weight() {
     // normalize max weight
     if (sum_weight == 0) {
         ROS_ERROR("Vehicle_model::normalize_weight():: sum weight is zero");
-        return;
+        all_weights_zero_ = true;
+        return false;
     }
     max_weight_ = max_weight / sum_weight;
-
+    all_weights_zero_ = false;
+    return true;
 }
 
 std::vector<double> Vehicle_model::get_weights() {
@@ -111,6 +114,21 @@ void Vehicle_model::add_particles(int number ){
     }
     particles_.insert( particles_.end(), new_particles.begin(), new_particles.end() );
 }
+
+
+geometry_msgs::PoseArray Vehicle_model::getParticlePoses() {
+    geometry_msgs::PoseArray pa;
+    pa.poses.resize(particles_.size());
+    for (size_t i = 0; i < particles_.size();i++) {
+        geometry_msgs::Pose p;
+        p.position.x = particles_[i].pose_.x;
+        p.position.y = particles_[i].pose_.y;
+        p.orientation = tf::createQuaternionMsgFromYaw(particles_[i].pose_.theta);
+        pa.poses[i] = p;
+    }
+    return pa;
+}
+
 
 
 
