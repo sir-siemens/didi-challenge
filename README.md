@@ -62,4 +62,4 @@ carIdModel = CarIDModel(loadweights=True)
 prediction = carIdModel.predictSingle(image)
 ```
 
-training was done using Udacity's P5 Vehicle detection datasets. 
+training was done using Udacity's P5 Vehicle detection datasets.
