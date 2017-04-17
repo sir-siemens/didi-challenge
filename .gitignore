@@ -1,0 +1,7 @@
+*.tar.gz
+data
+.idea
+.ipynb_checkpoints
+__pycache__
+rosws/build
+rosws/devel

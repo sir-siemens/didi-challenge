@@ -49,3 +49,17 @@ You should see some similar in rviz
 
 
 
+
+### Vehicle classifier
+How to use saved model.
+Notes:
+1. The model only accepts (64,64,3) so will have to do a resize function
+2. The model was trained on inputs with value between 0 - 1 rather than 0 - 255 so make sure inputs are in this value range
+see [a relative car_id_nn.ipynb](car_id_nn.ipynb) for more details
+```
+from car_id_model import CarIDModel
+carIdModel = CarIDModel(loadweights=True)
+prediction = carIdModel.predictSingle(image)
+```
+
+training was done using Udacity's P5 Vehicle detection datasets.
