@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   sensor_msgs
   pcl_conversions
+  tf
 )
 find_package(OpenCV)
 find_package(PCL 1.7 REQUIRED)

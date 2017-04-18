@@ -11,6 +11,7 @@ DetectionPipeline::DetectionPipeline() {
     //sensor_list_.push_back(velodyne);
     // delta t
     detection_interval_ = 0.1;
+    simualte_vehicle_kinematics_interval_ = 0.02;
     // 0.1 second
     ros::NodeHandle n;
     particle_publisher_ = n.advertise<geometry_msgs::PoseArray>(
@@ -20,9 +21,34 @@ DetectionPipeline::DetectionPipeline() {
     resampled_particle_after_motion_publisher_ = n.advertise<geometry_msgs::PoseArray>(
                 "resample_particles_after_motion_update", 1);
 
-    timer_ = n.createTimer(ros::Duration(detection_interval_), &DetectionPipeline::timerCallback,this);
+    ego_vehicle_visualizer =n.advertise<geometry_msgs::PoseArray>(
+                "ego_pose", 1);
 
+    // ego vel subscriber
+    ego_vel_sub_ = n.subscribe("/vehicle/twist",1 , &DetectionPipeline::ego_velCallback, this);
+
+    timer_ = n.createTimer(ros::Duration(detection_interval_), &DetectionPipeline::timerCallback,this);
+    simulate_vehicle_dynamics_timer_ = n.createTimer(ros::Duration(simualte_vehicle_kinematics_interval_),
+                                                     &DetectionPipeline::simulatetimerCallback,this);
+    // update ego pose
+    tf::TransformListener listener;
+    tf::StampedTransform transform;
+    while (ros::ok()) {
+        ros::Duration(0.01).sleep();
+        try {
+            // listener.waitForTransform("/gps", "/base_link", ros::Time(0));
+            listener.lookupTransform("/gps", "/base_link", ros::Time(0), transform);
+            break;
+        } catch  (tf::TransformException ex){
+            ROS_INFO("Wait bag to play");
+            continue;
+        }
+    }
+    ego_pose_.x = transform.getOrigin().x();
+    ego_pose_.y = transform.getOrigin().y();
+    ego_pose_.theta = tf::getYaw(transform.getRotation());
     timer_.start();
+    simulate_vehicle_dynamics_timer_.start();
 }
 
 void DetectionPipeline::detect() {
@@ -37,16 +63,12 @@ void DetectionPipeline::detect() {
         // TODO: data association is not done currently
         if (detected_vehicle_list_.size() == 0 && vehicles.size() != 0 ) {
             for (size_t j = 0; j < vehicles.size(); j++ ) {
+                vehicles[j].add_particles(500);
                 detected_vehicle_list_.push_back(vehicles[j]);
             }
         }
     }
-    // 2. create samples for each vehicle
-    for (size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
-        // TODO: currently particle only have 3 dimension
-        detected_vehicle_list_[i].add_particles(500);
-
-    }
+    ROS_INFO("Num: of Vehicles %d", (int)detected_vehicle_list_.size());
 
     ros::WallTime create_sample = ros::WallTime::now();
     ROS_INFO("Create initial sample takes %f second",  (create_sample - begin).toSec());
@@ -104,21 +126,17 @@ void DetectionPipeline::detect() {
 
         for (size_t j = 0 ; j < detected_vehicle_list_[i].particles_.size(); j++) {
             // update the particle pose motion prediction
-            detected_vehicle_list_[i].particles_[j] = Vehicle_model::motion_model(detected_vehicle_list_[i].particles_[j],
+            detected_vehicle_list_[i].particles_[j] = Vehicle_model::sample_from_motion_model(detected_vehicle_list_[i].particles_[j],
                                                                                              detection_interval_);
             // update the particle pose due to ego motion
             geometry_msgs::Pose2D ego_pose;
-            if (ego_velocity_.angular.z == 0) {
-                ego_pose.x = ego_velocity_.linear.x * detection_interval_;
-                ego_pose.y = 0;
-            } else {
-                Particle p;
-                p.velocity_ = ego_velocity_;
-                Particle p_aftermotion = Vehicle_model::motion_model (p , detection_interval_);
-                ego_pose.x = p_aftermotion.pose_.x;
-                ego_pose.y = p_aftermotion.pose_.y;
-                ego_pose.theta = p_aftermotion.pose_.theta;
-            }
+            Particle p;
+            p.velocity_ = ego_velocity_;
+            Particle p_aftermotion = Vehicle_model::exact_motion_model (p , detection_interval_);
+            ego_pose.x = p_aftermotion.pose_.x;
+            ego_pose.y = p_aftermotion.pose_.y;
+            ego_pose.theta = p_aftermotion.pose_.theta;
+
             // transform all the particles to the new coordinate system
             geometry_msgs::Transform baseTbase_delta;
             baseTbase_delta.translation.x = ego_pose.x;
@@ -161,7 +179,45 @@ void DetectionPipeline::visualize_particles(ros::Publisher &pub) {
 void DetectionPipeline::timerCallback(const ros::TimerEvent&) {
     // detection triggered
     current_time_ = ros::Time::now();
+    //
+    ROS_INFO("detection triggered");
     detect();
+
 }
+
+void DetectionPipeline::simulatetimerCallback(const ros::TimerEvent&) {
+    ROS_INFO("simulate triggered");
+    debug_ego_kmodel();
+}
+
+void DetectionPipeline::debug_ego_kmodel() {
+    // simualate vehicle dynamics
+    poses_.header.frame_id = "gps";
+    poses_.header.stamp = current_time_;
+    poses_.poses.push_back( Vehicle_model::pose2DtoPoseMsg(ego_pose_));
+    ego_pose_ = simulate_vehicle_dyamics(ego_pose_, ego_velocity_, simualte_vehicle_kinematics_interval_);
+    ego_vehicle_visualizer.publish(poses_);
+}
+
+
+geometry_msgs::Pose2D DetectionPipeline::simulate_vehicle_dyamics(geometry_msgs::Pose2D current_ego_pose,
+                                                 geometry_msgs::Twist current_vel,
+                                                 double theta_t) {
+    geometry_msgs::Pose2D ego_pose_prediction;
+    Particle p;
+    p.velocity_ = current_vel;
+    p.pose_ = current_ego_pose;
+    Particle p_aftermotion = Vehicle_model::exact_motion_model (p , theta_t);
+    ego_pose_prediction.x = p_aftermotion.pose_.x;
+    ego_pose_prediction.y = p_aftermotion.pose_.y;
+    ego_pose_prediction.theta = p_aftermotion.pose_.theta;
+    return ego_pose_prediction;
+}
+
+
+void DetectionPipeline::ego_velCallback(const geometry_msgs::TwistStamped::ConstPtr &msg) {
+    ego_velocity_ = msg->twist;
+}
+
 
 }

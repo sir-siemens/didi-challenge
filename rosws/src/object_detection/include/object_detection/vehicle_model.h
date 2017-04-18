@@ -24,9 +24,11 @@ public:
     Vehicle_model();
 
     // return expected pose when conduct a random noise
-    static Particle motion_model(Particle p, double theta_t);
+    static Particle sample_from_motion_model(Particle p, double theta_t);
 
+    static Particle exact_motion_model(Particle p, double theta_t);
 
+    static geometry_msgs::Pose pose2DtoPoseMsg(geometry_msgs::Pose2D p2d);
     // add particles based on the new detection
     void add_particles(int number);
 
@@ -46,14 +48,14 @@ public:
 
     geometry_msgs::PoseArray getParticlePoses();
 
-    std::vector<double> get_weights();
+    std::vector<double>  get_weights();
     std::vector< Particle > particles_;
     double max_weight_;
     static boost::random::mt19937 rng_;
 
     // parameter of motion noise
-    static double linear_noise_;  // 1.0 m/s
-    static double angular_noise_; // 5.0 grad
+    static double acceleration_noise_;  // 5.0 m/s^2
+    static double turn_radius_noise_; // 5.0 grad
 
     bool all_weights_zero_;
 };

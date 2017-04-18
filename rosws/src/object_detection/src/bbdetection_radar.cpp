@@ -8,7 +8,7 @@ BBDetection_Radar::BBDetection_Radar()
     target_w_ = 2.0;
     target_l_ = 5.0;
     fov_ =  M_PI/3.0;
-    param_sigma_gaussian_ = 1.0;
+    param_sigma_gaussian_ = 2.0;
     vehicle_radius_ = 4;
 
     base_linkTradar_ego_.translation.x = 3.8;
