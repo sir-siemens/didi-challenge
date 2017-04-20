@@ -9,12 +9,15 @@ BBDetection_Radar::BBDetection_Radar()
     target_l_ = 5.0;
     fov_ =  M_PI/3.0;
     param_sigma_gaussian_ = 2.0;
-    vehicle_radius_ = 4;
-
+    vehicle_radius_ = 2;
     base_linkTradar_ego_.translation.x = 3.8;
     base_linkTradar_ego_.rotation.w = 1.0;
     radarTbaselink_ego_ = inverseTransform(base_linkTradar_ego_);
     setBBCorner(target_l_,target_w_);
+
+
+    //
+
 }
 
 void BBDetection_Radar::setBBCorner(double length, double width) {
@@ -27,6 +30,15 @@ void BBDetection_Radar::setBBCorner(double length, double width) {
     br_.x = -length/2.0;
     br_.y = -width/2.0;
 }
+
+radar_driver::Track BBDetection_Radar::find_correspondence(geometry_msgs::Point desired_measurement) {
+    radar_driver::Track coorespond;
+    // read correspondence from the lookup table
+
+
+    return coorespond;
+}
+
 
 double BBDetection_Radar::find_correspondence_and_prob(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
                                          geometry_msgs::Point desired_measurement) {
@@ -48,6 +60,109 @@ double BBDetection_Radar::find_correspondence_and_prob(pcl::PointCloud<pcl::Poin
     double prob = 1.0 / (param_sigma_gaussian_ * sqrt(2*M_PI) )  * exp( -0.5* pow(min_distance/param_sigma_gaussian_ ,2));
     return prob;
 }
+
+
+
+double BBDetection_Radar::measurement_model_simple(radar_driver::RadarTracks filtered_radar_measurement,
+                                geometry_msgs::Pose2D ego_T_target) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr radar_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    radar_cloud->points.resize(filtered_radar_measurement.tracks.size());
+    for (size_t i = 0 ; i < filtered_radar_measurement.tracks.size(); i++) {
+        double range = filtered_radar_measurement.tracks[i].range;
+        double angle = -filtered_radar_measurement.tracks[i].angle / 180.0 * M_PI;
+        radar_cloud->points[i].x = range * cos(angle);
+        radar_cloud->points[i].y = range * sin(angle);
+    }
+    return measurement_model_simple(radar_cloud, ego_T_target);
+
+
+
+}
+
+double BBDetection_Radar::measurement_model_advanced(const radar_driver::RadarTracks &filtered_tracks,
+                                                     const std::vector< std::vector<int> >  &coorespondence_lookup_table,
+                                                     Particle p) {
+
+
+    geometry_msgs::Pose2D ego_T_target;
+    ego_T_target.x = p.pose_.x;
+    ego_T_target.y = p.pose_.y;
+    ego_T_target.theta = p.pose_.theta;
+    // compute desired measurement z^
+
+    // transform target in radar link
+    geometry_msgs::Transform egoTtarget_tr;
+    egoTtarget_tr.translation.x = ego_T_target.x;
+    egoTtarget_tr.translation.y = ego_T_target.y;
+    egoTtarget_tr.rotation = tf::createQuaternionMsgFromYaw (ego_T_target.theta);
+
+    geometry_msgs::Transform radarTtarget = multiplyTransformMsg(radarTbaselink_ego_,
+                                                                 egoTtarget_tr) ;
+    // determine if target vehicle in fov if not return 0 or a very small number
+    float yaw_angle = atan2(radarTtarget.translation.y, radarTtarget.translation.x);
+    if ( fabs(yaw_angle) > fov_/2.0 ) {
+        return 0.0;
+    }
+    // assume vehicle is a circle with radius
+    double t =  1 -   vehicle_radius_ / sqrt( pow(radarTtarget.translation.x,2) + pow(radarTtarget.translation.y,2) );
+    if (t > 0.0 && t < 1.0) {
+        double desired_measurement_x = t * radarTtarget.translation.x;
+        double desired_measurement_y = t * radarTtarget.translation.y;
+        geometry_msgs::Point desired_measurement;
+        desired_measurement.x = desired_measurement_x;
+        desired_measurement.y = desired_measurement_y;
+        double desired_range = sqrt (desired_measurement_x * desired_measurement_x + desired_measurement_y * desired_measurement_y);
+        double desired_angle = -atan2(desired_measurement_y, desired_measurement_x); // minus because in look up table positive axis of radar measurement is inversed
+        // compute prob w1: position w2: orientation w3: velocity
+        double desired_angle_degree = desired_angle * 180 / M_PI;
+
+        int angle_index = -1;
+        int range_index = -1;
+        compute_index_in_lookuptable(  desired_angle_degree, desired_range , angle_index, range_index);
+        // TODOradar_driver::Track correspondence =
+        bool correspondence_found = false;
+        radar_driver::Track correspondence_track;
+        if (angle_index >= 0 && angle_index < (int)fov_degree_ / angle_resolution_ &&
+                range_index >= 0 && range_index < (int)range_max_/ range_resolution_) {
+            int track_index = coorespondence_lookup_table[angle_index][range_index] ;
+            if (track_index != -1) {
+                // found correspondence
+                if (track_index >= filtered_tracks.tracks.size() ) {
+                    ROS_ERROR("track index is bigger than track size");
+                } else {
+                    correspondence_track = filtered_tracks.tracks[track_index];
+                    correspondence_found = true;
+                }
+            }
+        }
+
+        // return find_correspondence_and_prob(input_radar_cloud, desired_measurement);
+        if (correspondence_found) {
+            // compute p1 p2 p3
+            // euclidean distance between desired point and
+            geometry_msgs::Point measurement = radar_track2position(correspondence_track);
+
+            double distance = sqrt ( pow(( measurement.x - desired_measurement.x),2 ) + pow( (measurement.y - desired_measurement.y),2 ) );
+
+            double prob = 1.0 / (param_sigma_gaussian_ * sqrt(2*M_PI) )  * exp( -0.5* pow(distance/param_sigma_gaussian_ ,2));
+
+            // double v_x = p.velocity_.linear.x;
+
+            // double v_measurementInbaselink   = correspondence_track.rate
+
+            return prob;
+
+        } else {
+            return 0.0;
+        }
+    } else {
+        return 0;
+    }
+
+
+
+}
+
 
 double BBDetection_Radar::measurement_model_simple(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_radar_cloud,
                                 geometry_msgs::Pose2D ego_T_target ) {
@@ -228,6 +343,25 @@ geometry_msgs::Point BBDetection_Radar::transform_radar_ptInEgo_baselink(geometr
 
 }
 
+void BBDetection_Radar::compute_index_in_lookuptable( double angle, double range, int& angle_index, int& range_index ) {
+    int num_angle = fov_degree_ / angle_resolution_;
+    int num_range = range_max_ / range_resolution_;
+    double k = (double) num_angle / fov_degree_;
+    double b = k * (0.5 * fov_degree_);
+    double k_range = (double) num_range / range_max_;
+    angle_index = k * (angle) + b;
+    range_index = k_range * (range);
+}
+
+
+geometry_msgs::Point BBDetection_Radar::radar_track2position( radar_driver::Track track) {
+    double range = track.range;
+    double angle = -track.angle / 180.0 * M_PI;
+    geometry_msgs::Point p;
+    p.x = range * cos(angle);
+    p.y = range * sin(angle);
+    return p;
+}
 
 }
 

@@ -39,7 +39,6 @@ bool Vehicle_model::normalize_weight() {
             particles_[i].weight_ = particles_[i].weight_/sum_weight;
         }
     }
-
     max_weight_ = max_weight / sum_weight;
     all_weights_zero_ = false;
     return true;

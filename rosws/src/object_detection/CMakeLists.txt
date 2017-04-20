@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   pcl_conversions
   tf
+  radar_driver
+  visualization_msgs
 )
 find_package(OpenCV)
 find_package(PCL 1.7 REQUIRED)

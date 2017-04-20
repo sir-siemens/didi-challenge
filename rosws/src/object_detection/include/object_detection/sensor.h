@@ -17,6 +17,8 @@ public:
 
     virtual double compute_weight( Particle p);
 
+    virtual void preprocessing();
+
 
 };
 }

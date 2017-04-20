@@ -27,7 +27,7 @@ DetectionPipeline::DetectionPipeline() {
     // ego vel subscriber
     ego_vel_sub_ = n.subscribe("/vehicle/twist",1 , &DetectionPipeline::ego_velCallback, this);
 
-    timer_ = n.createTimer(ros::Duration(detection_interval_), &DetectionPipeline::timerCallback,this);
+    timer_ = n.createTimer(ros::Duration(detection_interval_), &DetectionPipeline::timerCallback,this , false, false );
     simulate_vehicle_dynamics_timer_ = n.createTimer(ros::Duration(simualte_vehicle_kinematics_interval_),
                                                      &DetectionPipeline::simulatetimerCallback,this);
     // update ego pose
@@ -47,16 +47,24 @@ DetectionPipeline::DetectionPipeline() {
     ego_pose_.x = transform.getOrigin().x();
     ego_pose_.y = transform.getOrigin().y();
     ego_pose_.theta = tf::getYaw(transform.getRotation());
-    timer_.start();
+    // timer_.start();
     simulate_vehicle_dynamics_timer_.start();
 }
 
 void DetectionPipeline::detect() {
 
+
+
+
     ros::WallTime begin = ros::WallTime::now();
+    // 0. sensor preprocessing
+
+
+
     // 1. vehicle detection and propose new particles from the current measurement 500
     for (size_t i = 0; i < sensor_list_.size(); i++) {
         std::vector <Vehicle_model> vehicles;
+        sensor_list_[i] ->preprocessing();
         sensor_list_[i] ->detect_vehicle(vehicles);
         // TODO: merge with the current detected vehicles
         // TODO: currently we only add vehicles we should also be able to remove !!!
@@ -75,7 +83,7 @@ void DetectionPipeline::detect() {
 
     // 3. compute weights for each particles
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
-
+        ros::WallTime compute_weight_begin = ros::WallTime::now();
         for (size_t j = 0 ; j <  detected_vehicle_list_[i].particles_.size(); j++ ) {
             // TODO: combine weight for all the sensing modality w = 1/3 *w1 + 1/3 *w2 + 1/3 *w3
             double total_weight = 0;
@@ -86,10 +94,12 @@ void DetectionPipeline::detect() {
             detected_vehicle_list_[i].particles_[j].weight_ = total_weight;
         }
         detected_vehicle_list_[i].normalize_weight();
+        ros::WallTime compute_weight_end = ros::WallTime::now();
+        ROS_INFO("compute_weights for 1 tracked object takes %f second",  (compute_weight_end - compute_weight_begin).toSec());
     }
 
     ros::WallTime compute_weights = ros::WallTime::now();
-    ROS_INFO("compute_weights takes %f second",  (compute_weights - create_sample).toSec());
+    // ROS_INFO("compute_weights takes %f second",  (compute_weights - create_sample).toSec());
 
 
     //// DEBUG visualize particles
@@ -120,6 +130,7 @@ void DetectionPipeline::detect() {
     }
     // 6. visualize the result
 
+    ros::WallTime prediction_begin = ros::WallTime::now();
 
     // 7. perform vehicle dynamics on particles and ego vehicle
     for ( size_t i = 0 ; i < detected_vehicle_list_.size(); i++) {
@@ -155,6 +166,9 @@ void DetectionPipeline::detect() {
             detected_vehicle_list_[i].particles_[j].pose_.theta = tf::getYaw(base_deltaTparticle.rotation);
         }
     }
+    ros::WallTime prediction_end = ros::WallTime::now();
+    ROS_INFO("Prediction takes %f second",  (prediction_end-prediction_begin).toSec());
+
     //// DEBUG visualize particles
     visualize_particles(resampled_particle_after_motion_publisher_);
     //////////////////////////////////////////

@@ -15,4 +15,9 @@ double Sensor::compute_weight( Particle p) {
     ROS_ERROR("virtual function should be implemented in the derived class");
 }
 
+void Sensor::preprocessing() {
+    ROS_ERROR("virtual function should be implemented in the derived class");
+}
+
+
 }
